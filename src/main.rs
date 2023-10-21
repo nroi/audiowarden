@@ -77,13 +77,13 @@ fn handle_message(message: &dbus::Message) {
                     Ok(v) => v.contains(&attrs.url.to_string()),
                     Err(_) => false,
                 };
-                if blocked {
-                    println!("Song is blocked: Will skip to next song.");
-                    play_next()
+                let suffix = if blocked {
+                    play_next();
+                    "[BLOCKED]"
                 } else {
-                    println!("Song is not blocked.");
-                }
-                println!("{}", attrs);
+                    "[NOT BLOCKED]"
+                };
+                println!("{} {}", attrs, suffix);
             }
         }
     }
