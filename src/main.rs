@@ -175,11 +175,14 @@ fn get_attrs(dict: &MessageItemDict) -> Option<SongAttributes> {
     }
 
     match url {
-        None => {
-            warn!("Required attribute URL was not found");
+        Some(url) if url.contains("open.spotify.com") => {
+            Some(SongAttributes { url, artist, title })
+        }
+        _ => {
+            // if no URL exists, or the URL does not contain the spotify host, then the event was probably not emitted
+            // by spotify and should be ignored.
             None
         }
-        Some(url) => Some(SongAttributes { url, artist, title }),
     }
 }
 #[derive(Debug)]
