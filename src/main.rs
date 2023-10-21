@@ -8,12 +8,16 @@ use dbus::message::MatchRule;
 use dbus::strings::Member;
 use dbus::MessageType;
 
+#[macro_use]
+extern crate log;
+
 mod config;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
     let blocked_songs = config::get_blocked_songs();
     if let Ok(songs) = &blocked_songs {
-        println!("{} songs are blocked.", songs.len());
+        debug!("{} songs are blocked.", songs.len());
     }
 
     let conn = Connection::new_session()?;
@@ -71,7 +75,7 @@ fn handle_message(message: &dbus::Message) {
             if let Some(attrs) = get_attrs(d) {
                 let blocked_songs = config::get_blocked_songs();
                 if let Ok(songs) = &blocked_songs {
-                    println!("{} songs are blocked.", songs.len());
+                    debug!("{} songs are blocked.", songs.len());
                 }
                 let blocked = match &blocked_songs {
                     Ok(v) => v.contains(&attrs.url.to_string()),
@@ -83,7 +87,7 @@ fn handle_message(message: &dbus::Message) {
                 } else {
                     "[NOT BLOCKED]"
                 };
-                println!("{} {}", attrs, suffix);
+                info!("{} {}", attrs, suffix);
             }
         }
     }
@@ -114,7 +118,7 @@ fn vec_from_message_item(message_item: &MessageItem) -> Option<Vec<&str>> {
 }
 
 fn get_attrs(dict: &MessageItemDict) -> Option<SongAttributes> {
-    println!("processing dict: {:?}", dict);
+    debug!("processing dict: {:?}", dict);
     let mut artist: Option<String> = None;
     let mut title: Option<String> = None;
     let mut url: Option<String> = None;
@@ -137,7 +141,7 @@ fn get_attrs(dict: &MessageItemDict) -> Option<SongAttributes> {
                                     artist = Some(a.join(", "));
                                 }
                                 None => {
-                                    println!("Unable to parse artists from {:?}", value);
+                                    warn!("Unable to parse artists from {:?}", value);
                                 }
                             }
                         }
@@ -147,7 +151,7 @@ fn get_attrs(dict: &MessageItemDict) -> Option<SongAttributes> {
                                     title = Some(t.to_string());
                                 }
                                 None => {
-                                    println!("Unable to parse title from {:?}", value);
+                                    warn!("Unable to parse title from {:?}", value);
                                 }
                             }
                         }
@@ -157,7 +161,7 @@ fn get_attrs(dict: &MessageItemDict) -> Option<SongAttributes> {
                                     url = Some(u.to_string());
                                 }
                                 None => {
-                                    println!("Unable to parse URL from {:?}", value);
+                                    warn!("Unable to parse URL from {:?}", value);
                                 }
                             }
                         }
@@ -172,7 +176,7 @@ fn get_attrs(dict: &MessageItemDict) -> Option<SongAttributes> {
 
     match url {
         None => {
-            println!("Required attribute URL was not found");
+            warn!("Required attribute URL was not found");
             None
         }
         Some(url) => Some(SongAttributes { url, artist, title }),

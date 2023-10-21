@@ -62,7 +62,7 @@ fn parse_config_file(path: &Path) -> Result<HashSet<String>, Error> {
             url.set_query(None);
             valid_urls.insert(url.to_string());
         } else {
-            eprintln!(
+            error!(
                 "Error in line {}: the following is not a valid URL: {}",
                 line_number + 1,
                 line
@@ -99,15 +99,15 @@ fn create_initial_config_file(path: &Path) {
             \n# own song URLs.\
             \nhttps://open.spotify.com/track/6CE6xXEI29e6X0noaNugIW\n";
             if let Err(err) = file.write_all(explanation) {
-                eprintln!("Error writing to file: {}", err);
+                error!("Error writing to file: {}", err);
             }
         }
         Err(err) if err.kind() == ErrorKind::AlreadyExists => {
-            println!("File {:?} already exists.", path);
+            debug!("File {:?} already exists.", path);
             // File already exists, nothing to do.
         }
         Err(err) => {
-            eprintln!("Error creating file at path {:?}: {}", path, err);
+            warn!("Error creating file at path {:?}: {}", path, err);
         }
     }
 }
