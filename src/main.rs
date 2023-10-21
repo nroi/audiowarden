@@ -15,6 +15,8 @@ use dbus::strings::Member;
 use dbus::MessageType;
 
 fn play_next() {
+
+
     // TODO it would be nice if we could just re-use an existing connection here instead of
     //   creating a new one, but Rust's ownership semantics makes this a bit difficult.
     let conn = Connection::new_session().unwrap();
