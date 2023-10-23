@@ -20,24 +20,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         debug!("{} songs are blocked.", songs.len());
     }
 
-    let conn = Connection::new_session()?;
+    let conn = Connection::new_session().expect("Unable to open D-Bus connection.");
     let proxy = conn.with_proxy(
         "org.freedesktop.DBus",
         "/org/freedesktop/DBus",
         Duration::from_millis(5000),
     );
 
+    let path = dbus::Path::new("/org/mpris/MediaPlayer2").expect("Invalid D-Bus path.");
+    let member = Member::new("PropertiesChanged").expect("Invalid D-Bus member.");
     let rule = MatchRule::new()
-        .with_path(dbus::Path::new("/org/mpris/MediaPlayer2").unwrap())
+        .with_path(path)
         .with_type(MessageType::Signal)
-        .with_member(Member::new("PropertiesChanged").unwrap());
+        .with_member(member);
 
     let result: Result<(), dbus::Error> = proxy.method_call(
         "org.freedesktop.DBus.Monitoring",
         "BecomeMonitor",
         (vec![rule.match_str()], 0u32),
     );
-    result.unwrap();
+    result.expect("Unable to execute method against D-Bus.");
 
     conn.start_receive(
         rule,
@@ -50,14 +52,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Loop and print out all messages received (using handle_message()) as they come.
     // Some can be quite large, e.g. if they contain embedded images..
     loop {
-        conn.process(Duration::from_millis(1000)).unwrap();
+        conn.process(Duration::from_millis(1000))
+            .expect("Unable to process D-Bus message.");
     }
 }
 
 fn play_next() {
     // TODO it would be nice if we could just re-use an existing connection here instead of
     //   creating a new one, but Rust's ownership semantics makes this a bit difficult.
-    let conn = Connection::new_session().unwrap();
+    let conn =
+        Connection::new_session().expect("Unable to open D-Bus connection to play next song.");
     let proxy = conn.with_proxy(
         "org.mpris.MediaPlayer2.spotify",
         "/org/mpris/MediaPlayer2",
@@ -66,7 +70,7 @@ fn play_next() {
 
     let result: Result<(), dbus::Error> =
         proxy.method_call("org.mpris.MediaPlayer2.Player", "Next", ());
-    result.unwrap();
+    result.expect("Unable to execute method against D-Bus to play next song.");
 }
 
 fn handle_message(message: &dbus::Message) {
