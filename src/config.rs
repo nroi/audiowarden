@@ -74,8 +74,12 @@ fn parse_config_file(path: &Path) -> Result<HashSet<String>, Error> {
 }
 
 fn get_config_path() -> Result<PathBuf, String> {
-    if let Ok(xdg_config_home) = env::var("XDG_CONFIG_HOME") {
-        Ok(Path::new(&xdg_config_home).join(APPLICATION_NAME).join(""))
+    if let Ok(config_dir) = env::var("CONFIGURATION_DIRECTORY") {
+        // CONFIGURATION_DIRECTORY is set if this application runs via systemd: More details here:
+        // https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#RuntimeDirectory=
+        Ok(Path::new(&config_dir).to_path_buf())
+    } else if let Ok(xdg_config_home) = env::var("XDG_CONFIG_HOME") {
+        Ok(Path::new(&xdg_config_home).join(APPLICATION_NAME))
     } else if let Ok(home) = env::var("HOME") {
         let config_path = Path::new(&home).join(".config").join(APPLICATION_NAME);
         Ok(config_path)
