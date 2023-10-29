@@ -35,7 +35,7 @@ fn create_config_path_and_file() -> PathBuf {
             filepath
         }
         Err(e) => {
-            panic!("Unable to fetch config file: {}", e);
+            panic!("Unable to fetch config directory: {}", e);
         }
     }
 }
@@ -73,7 +73,7 @@ fn parse_config_file(path: &Path) -> Result<HashSet<String>, Error> {
     Ok(valid_urls)
 }
 
-fn get_config_path() -> Result<PathBuf, String> {
+pub fn get_config_path() -> Result<PathBuf, String> {
     if let Ok(config_dir) = env::var("CONFIGURATION_DIRECTORY") {
         // CONFIGURATION_DIRECTORY is set if this application runs via systemd: More details here:
         // https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#RuntimeDirectory=

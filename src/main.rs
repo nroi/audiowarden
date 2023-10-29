@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
+use crate::config::get_config_path;
 use dbus::arg::messageitem::{MessageItem, MessageItemDict};
 use dbus::blocking::Connection;
 use dbus::channel::MatchingReceiver;
@@ -15,6 +16,17 @@ mod config;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
+    match get_config_path() {
+        Ok(path) => {
+            // We're not doing anything with the directory, but it's still useful to display
+            // the directory upon start for first-time users, so they know which file they
+            // need to edit.
+            info!("Configuration directory: {}", &path.display())
+        }
+        Err(e) => {
+            panic!("Unable to fetch config directory: {}", e);
+        }
+    }
     let blocked_songs = config::get_blocked_songs();
     if let Ok(songs) = &blocked_songs {
         debug!("{} songs are blocked.", songs.len());
