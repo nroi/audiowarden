@@ -19,10 +19,29 @@ on other operating systems like Windows and Mac OS X.
 I expect audiowarden to run on every Linux distribution. Feel free to open an issue if you can't get it to run
 on your Linux distribution.
 
+I have not tested audiowarden on ARM devices, but I expect it to run on ARM as well. However, you will need to compile
+it yourself, because only x86 binaries are available at the release page at the moment.
+
 ## How-to use it
 
 ### Installation
-If you use ArchLinux, a package is available on the AUR (TODO add link here).
+
+#### Arch Linux
+If you use ArchLinux, a package is available on the [AUR](https://aur.archlinux.org/packages/audiowarden).
+
+#### Other Linux Distributions
+
+If you're using another Linux distribution, you can just fetch the binary from the release section,
+or clone the code and build it via cargo:
+```
+cargo build --release
+```
+
+If you want to use systemd to have audiowarden run in the background, you can fetch a systemd service
+user from the AUR:
+
+TODO add AUR link here.
+
 
 ### Run it
 You can just execute the binary, but you will probably want to set up a systemd service to have it
@@ -46,7 +65,6 @@ Again, execute this command as your normal user, not as root.
 
 Next, open the config file. In most cases, it will be stored in
 `~/.config/audiowarden/blocked_songs.conf`.
-
 If that file does not exist, check the output of the previously mentioned `journalctl` command:
 
 ```bash
@@ -68,15 +86,17 @@ URL that looks like this:
 https://open.spotify.com/track/6CE6xXEI29e6X0noaNugIW
 ```
 
-If the URL also includes the `si` query param, that does not matter, so something like this
+If the URL also includes the `si` query parameter, that does not matter, so something like this
 is also acceptable:
 
 ```
 https://open.spotify.com/track/6myHCyqMUCtqqsYZj9WZBR?si=6a1711d6e4a04265
 ```
 
+### How to block songs
+
 If you have a song playing in Spotify, and you want to block this, simply use the "share" functionality
-to obtain this URL: For example, if you use the Spotify Desktop app, open the context menu of a song via Right-click
+to obtain its URL: For example, if you use the Spotify Desktop app, open the context menu of a song via Right-click
 or by clicking on the three dots.
 Next, click on "Share", and then on "Copy Song Link".
 
@@ -86,3 +106,15 @@ of all selected songs into your clipboard.
 
 Add the URLs into the `blocked_songs.conf` file, with one URL per line. It is not required to restart audiowarden:
 Once you play a new song, audiowarden will read the config file and pick up any changes you've made.
+
+### Bugs, Questions, Feedback & Suggestions
+
+If you found bug, please open a new [issue](https://github.com/nroi/audiowarden/issues).
+
+If you have questions, feedback or want to have some feature implemented, please use the 
+[discussions page](https://github.com/nroi/audiowarden/discussions) instead.
+
+For Bugfixes and smaller improvements, Pull Requests are always welcome, but before you invest too much time
+implementing a feature or some other improvement, please create a new thread at the
+[discussions page](https://github.com/nroi/audiowarden/discussions) first to clarify if what you're planning
+to build is actually desired.
