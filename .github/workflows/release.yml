@@ -1,0 +1,88 @@
+# Copied from ripgrep: https://github.com/BurntSushi/ripgrep/blob/master/.github/workflows/release.yml
+#
+# The way this works is the following:
+#
+# The create-release job runs purely to initialize the GitHub release itself
+# and to output upload_url for the following job.
+#
+# The build-release job runs only once create-release is finished. It gets the
+# release upload URL from create-release job outputs, then builds the release
+# executables for each supported platform and attaches them as release assets
+# to the previously created release.
+#
+# The key here is that we create the release only once.
+#
+# Reference:
+# https://eugene-babichenko.github.io/blog/2020/05/09/github-actions-cross-platform-auto-releases/
+
+name: release
+on:
+  push:
+    # Enable when testing release infrastructure on a branch.
+    # branches:
+    # - ag/work
+    tags:
+    - "[0-9]+.[0-9]+.[0-9]+"
+jobs:
+  create-release:
+    name: create-release
+    runs-on: ubuntu-latest
+    outputs:
+      audiowarden_version: ${{ env.AUDIOWARDEN_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get the release version from the tag
+        shell: bash
+        if: env.AUDIOWARDEN_VERSION == ''
+        run: |
+          echo "AUDIOWARDEN_VERSION=$GITHUB_REF_NAME" >> $GITHUB_ENV
+          echo "version is: ${{ env.AUDIOWARDEN_VERSION }}"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create ${{ env.AUDIOWARDEN_VERSION }}
+
+  build-release:
+    name: build-release
+    needs: ['create-release']
+    runs-on: ubuntu-20.04
+    env:
+      RUST_BACKTRACE: 1
+      RUST_LOG: debug
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install packages (Ubuntu)
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y libdbus-1-dev dbus at-spi2-core
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Build release binary
+      run: cargo build --verbose --release
+
+    - name: Strip release binary
+      run: strip "target/release/audiowarden"
+
+    - name: Build archive
+      shell: bash
+      run: |
+        release_dir='audiowarden-x86'
+        mkdir "$release_dir"
+        cp "target/release/audiowarden" "$release_dir/"
+        cp LICENSE README.md "$release_dir/"
+        tar czf "$release_dir.tar.gz" "$release_dir"
+        shasum -a 256 "$release_dir.tar.gz" > "$release_dir.tar.gz.sha256"
+        echo "ASSET=$release_dir.tar.gz" >> $GITHUB_ENV
+        echo "ASSET_SUM=$release_dir.tar.gz.sha256" >> $GITHUB_ENV
+
+    - name: Upload release archive
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release upload ${{ needs.create-release.outputs.audiowarden_version }} ${{ env.ASSET }} ${{ env.ASSET_SUM }}
