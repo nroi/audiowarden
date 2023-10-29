@@ -38,10 +38,7 @@ cargo build --release
 ```
 
 If you want to use systemd to have audiowarden run in the background, you can fetch a systemd service
-user from the AUR:
-
-TODO add AUR link here.
-
+user from the [AUR](https://aur.archlinux.org/cgit/aur.git/plain/audiowarden.service?h=audiowarden).
 
 ### Run it
 You can just execute the binary, but you will probably want to set up a systemd service to have it
