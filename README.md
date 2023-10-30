@@ -27,7 +27,7 @@ it yourself, because only x86 binaries are available at the release page at the 
 ### Installation
 
 #### Arch Linux
-If you use ArchLinux, a package is available on the [AUR](https://aur.archlinux.org/packages/audiowarden).
+If you use ArchLinux, a package is available on the [AUR](https://aur.archlinux.org/packages/audiowarden-git).
 
 #### Other Linux Distributions
 
