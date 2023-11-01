@@ -1,22 +1,29 @@
+#[macro_use]
+extern crate log;
+
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
-use crate::config::get_config_path;
 use dbus::arg::messageitem::{MessageItem, MessageItemDict};
+use dbus::arg::RefArg;
+use dbus::blocking::stdintf::org_freedesktop_dbus::Properties;
 use dbus::blocking::Connection;
 use dbus::channel::MatchingReceiver;
 use dbus::message::MatchRule;
 use dbus::strings::Member;
-use dbus::MessageType;
-
-#[macro_use]
-extern crate log;
+use dbus::{arg, MessageType};
 
 mod config;
+mod error;
+mod messaging;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-    match get_config_path() {
+
+    messaging::setup_channel();
+
+    match config::get_config_path() {
         Ok(path) => {
             // We're not doing anything with the directory, but it's still useful to display
             // the directory upon start for first-time users, so they know which file they
@@ -107,6 +114,32 @@ fn handle_message(message: &dbus::Message) {
             }
         }
     }
+}
+
+pub fn current_song() -> Option<SongAttributes> {
+    // TODO it would be nice if we could just re-use an existing connection here instead of
+    //   creating a new one, but Rust's ownership semantics makes this a bit difficult.
+    let conn =
+        Connection::new_session().expect("Unable to open D-Bus connection to play next song.");
+
+    let proxy = conn.with_proxy(
+        "org.mpris.MediaPlayer2.spotify",
+        "/org/mpris/MediaPlayer2",
+        Duration::from_millis(5000),
+    );
+    let metadata: HashMap<String, arg::Variant<Box<dyn RefArg>>> = proxy
+        .get("org.mpris.MediaPlayer2.Player", "Metadata")
+        .unwrap();
+    let title = &metadata["xesam:title"].as_str();
+    let url_attr = &metadata["xesam:url"].as_str();
+    let artists: Option<&Vec<String>> = arg::prop_cast(&metadata, "xesam:artist");
+    let artist = artists.map(|a| a.join(", "));
+
+    url_attr.map(|url| SongAttributes {
+        url: url.to_string(),
+        artist,
+        title: title.map(|x| x.to_string()),
+    })
 }
 
 fn string_from_message_item(message_item: &MessageItem) -> Option<&str> {
@@ -202,7 +235,7 @@ fn get_attrs(dict: &MessageItemDict) -> Option<SongAttributes> {
     }
 }
 #[derive(Debug)]
-struct SongAttributes {
+pub struct SongAttributes {
     url: String,
     artist: Option<String>,
     title: Option<String>,
@@ -221,3 +254,5 @@ impl Display for SongAttributes {
         write!(f, "Artist: {}, Title: {}, URL: {}", artist, title, self.url)
     }
 }
+
+pub const APPLICATION_NAME: &str = "audiowarden";

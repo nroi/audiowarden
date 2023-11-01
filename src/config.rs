@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
+use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Write};
 use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::{env, fs, io};
 
+use crate::APPLICATION_NAME;
 use url::Url;
 
 pub fn get_blocked_songs() -> Result<HashSet<String>, Error> {
@@ -84,21 +85,22 @@ pub fn get_config_path() -> Result<PathBuf, String> {
         let config_path = Path::new(&home).join(".config").join(APPLICATION_NAME);
         Ok(config_path)
     } else {
-        Err("Neither XDG_CONFIG_HOME nor HOME environment variables are set.".to_string())
+        Err(
+            "None of the environment vars CONFIGURATION_DIRECTORY, XDG_CONFIG_HOME or HOME is set."
+                .to_string(),
+        )
     }
 }
 
 fn create_initial_config_file(path: &Path) {
     match OpenOptions::new().create_new(true).write(true).open(path) {
         Ok(mut file) => {
-            // TODO maybe describe this in more detail in a markdown file. In particular,
-            // also describe that we can copy a full playlist with Ctrl-C and then just paste
-            // the URLs all-at-once with Ctrl-V.
             let explanation = b"# Enter all songs that you don't want to listen to anymore here.\
             \n# Make sure to enter valid spotify URLs only: You can get them from the Spotify app\
             \n# via the 'share' functionality. For example, if you use the desktop version of\
             \n# Spotify, right-click a song, click share, and then 'Copy Song Link'.\
-            \n# You can also select multiple songs and copy them with Ctrl + c to have multiple URLs in your clipboard.\
+            \n# You can also select multiple songs and copy them with Ctrl + c to have multiple \
+            \n# URLs in your clipboard.\
             \n\n# The following line is included for testing and demonstration purposes: Feel free\
             \n# to remove this line (and everything else in this file) to replace it by your\
             \n# own song URLs.\
@@ -117,4 +119,10 @@ fn create_initial_config_file(path: &Path) {
     }
 }
 
-const APPLICATION_NAME: &str = "audiowarden";
+pub fn add_to_config_file(content: &str) -> io::Result<()> {
+    let path = create_config_path_and_file();
+    let file = OpenOptions::new().append(true).open(path)?;
+    let mut writer = BufWriter::new(file);
+    writer.write_all(content.as_bytes())?;
+    Ok(())
+}
