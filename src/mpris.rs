@@ -41,8 +41,6 @@ pub fn setup_mpris_connection() {
         }),
     );
 
-    // Loop and print out all messages received (using handle_message()) as they come.
-    // Some can be quite large, e.g. if they contain embedded images..
     loop {
         conn.process(Duration::from_millis(1000))
             .expect("Unable to process D-Bus message.");
