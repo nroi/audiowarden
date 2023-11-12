@@ -63,6 +63,8 @@ fn process_incoming_messages(rx: Receiver<ClientMessage>) {
             },
             Err(e) => {
                 error!("Error while receiving message on channel: {:?}", e);
+                // Avoid spamming the logs in an infinite loop:
+                break;
             }
         }
     }
