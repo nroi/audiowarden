@@ -60,7 +60,12 @@ pub fn play_next() {
 
     let result: Result<(), dbus::Error> =
         proxy.method_call("org.mpris.MediaPlayer2.Player", "Next", ());
-    result.expect("Unable to execute method against D-Bus to play next song.");
+    if let Err(e) = result {
+        error!(
+            "Unable to execute method against D-Bus to play next song: {:?}",
+            e
+        );
+    }
 }
 
 fn handle_message(message: &dbus::Message) {
