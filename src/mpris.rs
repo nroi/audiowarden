@@ -1,4 +1,7 @@
-use crate::config;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::time::Duration;
+
 use dbus::arg::messageitem::{MessageItem, MessageItemDict};
 use dbus::arg::RefArg;
 use dbus::blocking::stdintf::org_freedesktop_dbus::Properties;
@@ -7,9 +10,8 @@ use dbus::channel::MatchingReceiver;
 use dbus::message::MatchRule;
 use dbus::strings::Member;
 use dbus::{arg, MessageType};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::time::Duration;
+
+use crate::config;
 
 pub fn setup_mpris_connection() {
     let conn = Connection::new_session().expect("Unable to open D-Bus connection.");
@@ -69,25 +71,26 @@ pub fn play_next() {
 }
 
 fn handle_message(message: &dbus::Message) {
-    for message_item in message.get_items() {
-        if let MessageItem::Dict(d) = &message_item {
-            if let Some(attrs) = get_attrs(d) {
-                let blocked_songs = config::get_blocked_songs();
-                if let Ok(songs) = &blocked_songs {
-                    debug!("{} songs are blocked.", songs.len());
+    match config::get_blocked_songs() {
+        Ok(blocked_songs) => {
+            debug!("{} songs are blocked.", blocked_songs.len());
+            for message_item in message.get_items() {
+                if let MessageItem::Dict(d) = &message_item {
+                    if let Some(attrs) = get_attrs(d) {
+                        let song_is_blocked = blocked_songs.contains(&attrs.url.to_string());
+                        let suffix = if song_is_blocked {
+                            play_next();
+                            "[BLOCKED]"
+                        } else {
+                            "[NOT BLOCKED]"
+                        };
+                        info!("{} {}", attrs, suffix);
+                    }
                 }
-                let blocked = match &blocked_songs {
-                    Ok(v) => v.contains(&attrs.url.to_string()),
-                    Err(_) => false,
-                };
-                let suffix = if blocked {
-                    play_next();
-                    "[BLOCKED]"
-                } else {
-                    "[NOT BLOCKED]"
-                };
-                info!("{} {}", attrs, suffix);
             }
+        }
+        Err(e) => {
+            error!("Unable to determine blocked songs: {:?}", e)
         }
     }
 }
