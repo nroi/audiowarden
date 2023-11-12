@@ -13,6 +13,8 @@ use crate::APPLICATION_NAME;
 pub fn open_and_listen_unix_socket(tx: Sender<ClientMessage>) -> Result<(), AudioWardenError> {
     let path = get_and_create_socket_path()?;
     let path = path.join("audiowarden.sock");
+    // If the socket file already exists, just remove it. If we open the existing file, we get
+    // the error message "Address already in use".
     remove_socketfile(&path)?;
     let listener = UnixListener::bind(&path)?;
 
