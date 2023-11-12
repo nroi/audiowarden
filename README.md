@@ -1,6 +1,6 @@
 # audiowarden
 
-audiowarden runs in the background and automatically skips Spotify songs that you
+audiowarden runs in the background and automatically blocks Spotify songs that you
 don't want to hear anymore.
 
 You simply add all songs that you don't want to hear into a config file. audiowarden then runs in the background
