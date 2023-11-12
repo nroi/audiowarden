@@ -27,7 +27,7 @@ it yourself, because only x86 binaries are available at the release page at the 
 ### Installation
 
 #### Arch Linux
-If you use ArchLinux, a package is available on the [AUR](https://aur.archlinux.org/packages/audiowarden-git).
+If you use ArchLinux, a package is available on the [AUR](https://aur.archlinux.org/packages/audiowarden-bin).
 
 #### Other Linux Distributions
 
@@ -38,7 +38,7 @@ cargo build --release
 ```
 
 If you want to use systemd to have audiowarden run in the background, you can fetch a systemd service
-user from the [AUR](https://aur.archlinux.org/cgit/aur.git/plain/audiowarden.service?h=audiowarden).
+user from the [AUR](https://aur.archlinux.org/cgit/aur.git/plain/audiowarden.service?h=audiowarden-bin).
 
 ### Run it
 You can just execute the binary, but you will probably want to set up a systemd service to have it
