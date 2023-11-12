@@ -1,5 +1,5 @@
 use crate::config::add_to_config_file;
-use crate::{current_song, play_next};
+use crate::mpris;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 mod socket;
@@ -21,7 +21,7 @@ fn process_incoming_messages(rx: Receiver<ClientMessage>) {
         match rx.recv() {
             Ok(msg) => match msg {
                 ClientMessage::BlockCurrentSong => {
-                    match current_song() {
+                    match mpris::current_song() {
                         None => {
                             warn!("Unable to determine current song")
                         }
@@ -55,7 +55,7 @@ fn process_incoming_messages(rx: Receiver<ClientMessage>) {
                             }
                         }
                     }
-                    play_next();
+                    mpris::play_next();
                 }
             },
             Err(e) => {
