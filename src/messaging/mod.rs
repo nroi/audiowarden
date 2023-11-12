@@ -23,10 +23,13 @@ fn process_incoming_messages(rx: Receiver<ClientMessage>) {
                 ClientMessage::BlockCurrentSong => {
                     match mpris::current_song() {
                         None => {
-                            warn!("Unable to determine current song")
+                            warn!(
+                                "Cannot block song, because we're unable to \
+                                    determine the current song."
+                            );
                         }
                         Some(song_attrs) => {
-                            info!("Currently playing: {:?}", song_attrs);
+                            info!("Received request to block song: {:?}", song_attrs);
                             let attributes = vec![
                                 song_attrs
                                     .artist
