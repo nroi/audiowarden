@@ -99,7 +99,7 @@ fn create_initial_config_file(path: &Path) {
             \n# Make sure to enter valid spotify URLs only: You can get them from the Spotify app\
             \n# via the 'share' functionality. For example, if you use the desktop version of\
             \n# Spotify, right-click a song, click share, and then 'Copy Song Link'.\
-            \n# You can also select multiple songs and copy them with Ctrl + c to have multiple \
+            \n# You can also select multiple songs and copy them with Ctrl + c to have multiple\
             \n# URLs in your clipboard.\
             \n\n# The following line is included for testing and demonstration purposes: Feel free\
             \n# to remove this line (and everything else in this file) to replace it by your\
