@@ -106,7 +106,7 @@ Once you play a new song, audiowarden will read the config file and pick up any 
 
 Alternatively, if the song that you want to block is currently playing, you can send a message via a Unix Domain
 Socket, like so:
-```
+```bash
 echo 'block_current_song' | nc -N -U "$XDG_RUNTIME_DIR/audiowarden/audiowarden.sock"
 ```
 
