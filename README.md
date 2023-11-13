@@ -104,6 +104,14 @@ of all selected songs into your clipboard.
 Add the URLs into the `blocked_songs.conf` file, with one URL per line. It is not required to restart audiowarden:
 Once you play a new song, audiowarden will read the config file and pick up any changes you've made.
 
+Alternatively, if the song that you want to block is currently playing, you can send a message via a Unix Domain
+Socket, like so:
+```
+echo 'block_current_song' | nc -N -U "$XDG_RUNTIME_DIR/audiowarden/audiowarden.sock"
+```
+
+This requires netcat (`nc`) to be installed.
+
 ### Bugs, Questions, Feedback & Suggestions
 
 If you found bug, please open a new [issue](https://github.com/nroi/audiowarden/issues).
