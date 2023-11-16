@@ -1,8 +1,8 @@
 use std::io::ErrorKind::NotFound;
-use std::io::{ErrorKind, Read};
+use std::io::{ErrorKind, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::{env, fs, io, thread};
 
@@ -84,12 +84,23 @@ pub fn remove_socketfile(path: &Path) -> io::Result<()> {
 }
 
 pub fn handle_client(mut stream: UnixStream, tx: Arc<Sender<ClientMessage>>) {
-    let message_result = read_string(&mut stream);
+    let message_result = read_string_until_eof(&mut stream);
     match message_result {
-        Ok(s) if s == "block_current_song\n" || s == "block_current_song" => {
-            let message = ClientMessage::BlockCurrentSong;
-            if let Err(e) = tx.send(message) {
+        Ok(s) if s == "login_to_spotify\n" || s == "login_to_spotify" => {
+            let (tx_login, rx_login): (Sender<String>, Receiver<String>) = channel();
+            let message = ClientMessage::LoginToSpotify(tx_login);
+            if let Err(e) = tx.send(message.clone()) {
                 warn!("Unable to send message {:?}: {:?}", message, e);
+            }
+            let user_message = match rx_login.recv() {
+                Ok(message) => message,
+                Err(e) => {
+                    error!("Unable to receive message from channel: {:?}", e);
+                    return;
+                }
+            };
+            if let Err(e) = stream.write_all(user_message.as_bytes()) {
+                error!("Unable to send message via Unix socket: {:?}", e);
             }
         }
         Ok(s) => {
@@ -101,7 +112,7 @@ pub fn handle_client(mut stream: UnixStream, tx: Arc<Sender<ClientMessage>>) {
     };
 }
 
-fn read_string<R>(stream: &mut R) -> io::Result<String>
+fn read_string_until_eof<R>(stream: &mut R) -> io::Result<String>
 where
     R: Read,
 {

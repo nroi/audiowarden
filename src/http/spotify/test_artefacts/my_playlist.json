@@ -1,0 +1,49 @@
+{
+  "description": "test playlist for audiowarden",
+  "href": "https://api.spotify.com/v1/playlists/6i7r07KuYaY6X2C4wdHza7?fields=id,uri,name,description,href,snapshot_id,tracks(next,offset,limit,total),tracks.items(is_local,%20track(uri,external_urls,is_local,type))",
+  "id": "6i7r07KuYaY6X2C4wdHza7",
+  "name": "my playlist",
+  "snapshot_id": "NixmM2YzYTdmNmE4ODM4ZTdiZDQ2N2ZkYjg4NDVlOGI2ZGMyYjgyMmRj",
+  "tracks": {
+    "items": [
+      {
+        "is_local": false,
+        "track": {
+          "external_urls": {
+            "spotify": "https://open.spotify.com/track/1BncfTJAWxrsxyT9culBrj"
+          },
+          "is_local": false,
+          "type": "track",
+          "uri": "spotify:track:1BncfTJAWxrsxyT9culBrj"
+        }
+      },
+      {
+        "is_local": false,
+        "track": {
+          "external_urls": {
+            "spotify": "https://open.spotify.com/track/7xEX406hnVXC7mDfkts2jc"
+          },
+          "is_local": false,
+          "type": "track",
+          "uri": "spotify:track:7xEX406hnVXC7mDfkts2jc"
+        }
+      },
+      {
+        "is_local": false,
+        "track": {
+          "external_urls": {
+            "spotify": "https://open.spotify.com/track/56oReVXIfUO9xkX7pHmEU0"
+          },
+          "is_local": false,
+          "type": "track",
+          "uri": "spotify:track:56oReVXIfUO9xkX7pHmEU0"
+        }
+      }
+    ],
+    "limit": 100,
+    "next": null,
+    "offset": 0,
+    "total": 3
+  },
+  "uri": "spotify:playlist:6i7r07KuYaY6X2C4wdHza7"
+}

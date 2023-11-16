@@ -1,17 +1,14 @@
-use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
 use dbus::arg::messageitem::{MessageItem, MessageItemDict};
-use dbus::arg::RefArg;
-use dbus::blocking::stdintf::org_freedesktop_dbus::Properties;
 use dbus::blocking::Connection;
 use dbus::channel::MatchingReceiver;
 use dbus::message::MatchRule;
 use dbus::strings::Member;
-use dbus::{arg, MessageType};
+use dbus::MessageType;
 
-use crate::config;
+use crate::cache;
 
 pub fn setup_mpris_connection() {
     let conn = Connection::new_session().expect("Unable to open D-Bus connection.");
@@ -50,8 +47,6 @@ pub fn setup_mpris_connection() {
 }
 
 pub fn play_next() {
-    // TODO it would be nice if we could just re-use an existing connection here instead of
-    //   creating a new one, but Rust's ownership semantics makes this a bit difficult.
     let conn =
         Connection::new_session().expect("Unable to open D-Bus connection to play next song.");
     let proxy = conn.with_proxy(
@@ -71,19 +66,23 @@ pub fn play_next() {
 }
 
 fn handle_message(message: &dbus::Message) {
-    match config::get_blocked_songs() {
+    match cache::get_blocked_songs() {
         Ok(blocked_songs) => {
             debug!("{} songs are blocked.", blocked_songs.len());
             for message_item in message.get_items() {
                 if let MessageItem::Dict(d) = &message_item {
                     if let Some(attrs) = get_attrs(d) {
-                        let song_is_blocked = blocked_songs.contains(&attrs.url.to_string());
-                        let suffix = if song_is_blocked {
-                            play_next();
-                            "[BLOCKED]"
-                        } else {
-                            "[NOT BLOCKED]"
+                        let maybe_blocked_song = blocked_songs
+                            .iter()
+                            .find(|blocked_song| blocked_song.spotify_url == attrs.url);
+                        let suffix = match maybe_blocked_song {
+                            None => "[NOT BLOCKED]".to_string(),
+                            Some(blocked_song) => {
+                                play_next();
+                                format!("[BLOCKED] via playlist <{}>", blocked_song.playlist_name)
+                            }
                         };
+
                         info!("{} {}", attrs, suffix);
                     }
                 }
@@ -93,32 +92,6 @@ fn handle_message(message: &dbus::Message) {
             error!("Unable to determine blocked songs: {:?}", e)
         }
     }
-}
-
-pub fn current_song() -> Option<SongAttributes> {
-    // TODO it would be nice if we could just re-use an existing connection here instead of
-    //   creating a new one, but Rust's ownership semantics makes this a bit difficult.
-    let conn =
-        Connection::new_session().expect("Unable to open D-Bus connection to play next song.");
-
-    let proxy = conn.with_proxy(
-        "org.mpris.MediaPlayer2.spotify",
-        "/org/mpris/MediaPlayer2",
-        Duration::from_millis(5000),
-    );
-    let metadata: HashMap<String, arg::Variant<Box<dyn RefArg>>> = proxy
-        .get("org.mpris.MediaPlayer2.Player", "Metadata")
-        .unwrap();
-    let title = &metadata["xesam:title"].as_str();
-    let url_attr = &metadata["xesam:url"].as_str();
-    let artists: Option<&Vec<String>> = arg::prop_cast(&metadata, "xesam:artist");
-    let artist = artists.map(|a| a.join(", "));
-
-    url_attr.map(|url| SongAttributes {
-        url: url.to_string(),
-        artist,
-        title: title.map(|x| x.to_string()),
-    })
 }
 
 fn string_from_message_item(message_item: &MessageItem) -> Option<&str> {

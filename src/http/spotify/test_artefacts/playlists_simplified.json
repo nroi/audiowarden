@@ -1,0 +1,112 @@
+{
+  "href": "https://api.spotify.com/v1/users/john_doe/playlists?offset=0&limit=3",
+  "items": [
+    {
+      "collaborative": false,
+      "description": "test playlist for audiowarden",
+      "external_urls": {
+        "spotify": "https://open.spotify.com/playlist/2aj6oxgwTOFoynFcnU2U6T"
+      },
+      "href": "https://api.spotify.com/v1/playlists/2aj6oxgwTOFoynFcnU2U6T",
+      "id": "2aj6oxgwTOFoynFcnU2U6T",
+      "images": [],
+      "name": "playlist with local track",
+      "owner": {
+        "display_name": "john_doe",
+        "external_urls": {
+          "spotify": "https://open.spotify.com/user/john_doe"
+        },
+        "href": "https://api.spotify.com/v1/users/john_doe",
+        "id": "john_doe",
+        "type": "user",
+        "uri": "spotify:user:john_doe"
+      },
+      "primary_color": null,
+      "public": false,
+      "snapshot_id": "NCxhODZjNGQzOGM1ZDNlMDBmNWEzNjRlMzE0ZjBhOTZlZmZkNmExMmQ3",
+      "tracks": {
+        "href": "https://api.spotify.com/v1/playlists/2aj6oxgwTOFoynFcnU2U6T/tracks",
+        "total": 1
+      },
+      "type": "playlist",
+      "uri": "spotify:playlist:2aj6oxgwTOFoynFcnU2U6T"
+    },
+    {
+      "collaborative": false,
+      "description": "test playlist for audiowarden",
+      "external_urls": {
+        "spotify": "https://open.spotify.com/playlist/3jtq2m90g20x3JSdTjnDdZ"
+      },
+      "href": "https://api.spotify.com/v1/playlists/3jtq2m90g20x3JSdTjnDdZ",
+      "id": "3jtq2m90g20x3JSdTjnDdZ",
+      "images": [
+        {
+          "height": 640,
+          "url": "https://i.scdn.co/image/ab6765630000ba8a6ee4cb3d4e4eadce88abe5c0",
+          "width": 640
+        }
+      ],
+      "name": "playlist with podcast",
+      "owner": {
+        "display_name": "john_doe",
+        "external_urls": {
+          "spotify": "https://open.spotify.com/user/john_doe"
+        },
+        "href": "https://api.spotify.com/v1/users/john_doe",
+        "id": "john_doe",
+        "type": "user",
+        "uri": "spotify:user:john_doe"
+      },
+      "primary_color": null,
+      "public": false,
+      "snapshot_id": "NCxlMTA5MzhkMDA4MjU1MjNkNjdhNzg2MmM0N2I5OGQwMjU0NDQ2Mzc1",
+      "tracks": {
+        "href": "https://api.spotify.com/v1/playlists/3jtq2m90g20x3JSdTjnDdZ/tracks",
+        "total": 1
+      },
+      "type": "playlist",
+      "uri": "spotify:playlist:3jtq2m90g20x3JSdTjnDdZ"
+    },
+    {
+      "collaborative": false,
+      "description": "songs I don&#x27;t like to hear. audiowarden:block_songs.",
+      "external_urls": {
+        "spotify": "https://open.spotify.com/playlist/54MXIlypOpyez6JSGNhgVH"
+      },
+      "href": "https://api.spotify.com/v1/playlists/54MXIlypOpyez6JSGNhgVH",
+      "id": "54MXIlypOpyez6JSGNhgVH",
+      "images": [
+        {
+          "height": 640,
+          "url": "https://i.scdn.co/image/ab67616d0000b273986b3c7f75ef74254873f28b",
+          "width": 640
+        }
+      ],
+      "name": "Dislike",
+      "owner": {
+        "display_name": "john_doe",
+        "external_urls": {
+          "spotify": "https://open.spotify.com/user/john_doe"
+        },
+        "href": "https://api.spotify.com/v1/users/john_doe",
+        "id": "john_doe",
+        "type": "user",
+        "uri": "spotify:user:john_doe"
+      },
+      "primary_color": null,
+      "public": false,
+      "snapshot_id": "NCwwNzE4MTA2MjZmYWE2MDY5MmNlYTQ4ZTAxN2RmZWQ0YzVlYWZmZTli",
+      "tracks": {
+        "href": "https://api.spotify.com/v1/playlists/54MXIlypOpyez6JSGNhgVH/tracks",
+        "total": 2
+      },
+      "type": "playlist",
+      "uri": "spotify:playlist:54MXIlypOpyez6JSGNhgVH"
+    }
+  ],
+  "limit": 3,
+  "next": "https://api.spotify.com/v1/users/john_doe/playlists?offset=3&limit=3",
+  "offset": 0,
+  "previous": null,
+  "total": 81
+}

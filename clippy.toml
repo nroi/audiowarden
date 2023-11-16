@@ -1,0 +1,13 @@
+# https://rust-lang.github.io/rust-clippy/master/index.html#/result_large_err
+# increased this setting, because with the default, we can't use ureq
+# (https://github.com/algesten/ureq)
+large-error-threshold = 300
+
+# Increased this setting. The lint seems to be about performance optimizations
+# and minimizing memory usage, which is not our main priority at the moment.
+enum-variant-size-threshold = 300
+
+disallowed-macros = [
+    { path = "std::println" },
+    { path = "serde::Serialize", reason = "Usage of Serialize only possible by explicitly disabling the lint in the corresponding Rust module. Check the documentation in file_io/model.rs for more details." },
+]

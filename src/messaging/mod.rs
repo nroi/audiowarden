@@ -1,6 +1,6 @@
-use crate::config::add_to_config_file;
-use crate::mpris;
 use std::sync::mpsc::{channel, Receiver, Sender};
+
+use crate::{http, APPLICATION_NAME};
 
 mod socket;
 
@@ -20,45 +20,26 @@ fn process_incoming_messages(rx: Receiver<ClientMessage>) {
     loop {
         match rx.recv() {
             Ok(msg) => match msg {
-                ClientMessage::BlockCurrentSong => {
-                    match mpris::current_song() {
-                        None => {
-                            warn!(
-                                "Cannot block song, because we're unable to \
-                                    determine the current song."
-                            );
+                ClientMessage::LoginToSpotify(back_channel) => {
+                    match http::spotify::client::spotify_login_start() {
+                        Ok(authorization_url) => {
+                            let message = format!("{}\n", authorization_url);
+                            if let Err(e) = back_channel.send(message) {
+                                error!("Unable to send message via back_channel: {:?}", e);
+                            }
                         }
-                        Some(song_attrs) => {
-                            info!("Received request to block song: {:?}", song_attrs);
-                            let attributes = vec![
-                                song_attrs
-                                    .artist
-                                    .map(|artist| format!("Artist: {}", artist)),
-                                song_attrs.title.map(|title| format!("Title: {}", title)),
-                            ];
-                            let attributes: Vec<&str> = attributes
-                                .iter()
-                                .filter_map(|x| x.as_ref())
-                                .map(|x| x.as_str())
-                                .collect();
-                            let comment = if attributes.is_empty() {
-                                None
-                            } else {
-                                Some(format!("# {}", attributes.join(", ")))
-                            };
-
-                            let prefix = match comment {
-                                Some(c) => format!("{}\n", c),
-                                None => "".to_string(),
-                            };
-
-                            let config_entry = format!("\n{}{}\n", prefix, song_attrs.url);
-                            if let Err(e) = add_to_config_file(&config_entry) {
-                                warn!("Unable to add entry to config file: {:?}", e);
+                        Err(e) => {
+                            let message = format!(
+                                "Unable to start login process: {:?}. Maybe \
+                                there's already a login process pending. You may try \
+                                restarting {}.\n",
+                                e, APPLICATION_NAME
+                            );
+                            if let Err(e) = back_channel.send(message) {
+                                error!("Unable to send message via back_channel: {:?}", e);
                             }
                         }
                     }
-                    mpris::play_next();
                 }
             },
             Err(e) => {
@@ -70,7 +51,11 @@ fn process_incoming_messages(rx: Receiver<ClientMessage>) {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum ClientMessage {
-    BlockCurrentSong,
+    /**
+     * user requested to login to Spotify to give audiowarden the required authorizations
+     * for fetching playlists.
+     */
+    LoginToSpotify(Sender<String>),
 }

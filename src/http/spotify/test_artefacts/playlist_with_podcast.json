@@ -1,0 +1,27 @@
+{
+  "description": "test playlist for audiowarden",
+  "href": "https://api.spotify.com/v1/playlists/3jtq2m90g20x3JSdTjnDdZ?fields=id,uri,name,description,href,snapshot_id,tracks(next,offset,limit,total),tracks.items(is_local,track(uri,external_urls,is_local,type))",
+  "id": "3jtq2m90g20x3JSdTjnDdZ",
+  "name": "playlist with podcast",
+  "snapshot_id": "NCxlMTA5MzhkMDA4MjU1MjNkNjdhNzg2MmM0N2I5OGQwMjU0NDQ2Mzc1",
+  "tracks": {
+    "items": [
+      {
+        "is_local": false,
+        "track": {
+          "external_urls": {
+            "spotify": "https://open.spotify.com/episode/2hfRg2xGfokD333h69QQt8"
+          },
+          "is_local": false,
+          "type": "episode",
+          "uri": "spotify:episode:2hfRg2xGfokD333h69QQt8"
+        }
+      }
+    ],
+    "limit": 100,
+    "next": null,
+    "offset": 0,
+    "total": 1
+  },
+  "uri": "spotify:playlist:3jtq2m90g20x3JSdTjnDdZ"
+}
