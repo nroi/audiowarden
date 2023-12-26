@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, ErrorKind, Write};
 use std::path::{Path, PathBuf};
-use std::{env, io};
+use std::{env, fs, io};
 use ureq::serde_json;
 
 pub fn store_spotify_token(token: &TokenResponse) -> io::Result<()> {
@@ -22,7 +22,14 @@ pub fn store_spotify_token(token: &TokenResponse) -> io::Result<()> {
         refresh_token: token.refresh_token.clone(),
     };
     let token_as_json = serde_json::to_string(&token)?;
-    let file = File::create(filename)?;
+    let file = match File::create(&filename) {
+        Ok(f) => f,
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            create_state_directory()?;
+            File::create(&filename)?
+        }
+        Err(e) => return Err(e),
+    };
     let mut writer = BufWriter::new(file);
     writer.write_all(token_as_json.as_bytes())?;
 
@@ -54,6 +61,11 @@ pub fn get_spotify_token() -> io::Result<Option<TokenResponse>> {
 fn get_spotify_token_filename() -> Result<PathBuf, String> {
     let cache_directory = get_state_directory();
     Ok(cache_directory.join("spotify_token.json"))
+}
+
+fn create_state_directory() -> io::Result<()> {
+    let directory = get_state_directory();
+    fs::create_dir_all(directory)
 }
 
 fn get_state_directory() -> PathBuf {

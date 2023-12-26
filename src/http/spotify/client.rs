@@ -1,4 +1,5 @@
 use std::io;
+use std::time::Duration;
 
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -78,6 +79,7 @@ fn request_with_auth<T>(
     request: ureq::Request,
     token_container: &mut TokenContainer,
     retry_after_auth_failure: bool,
+    exponential_backoff: ExponentialBackoff,
 ) -> ClientConnectionResult<T>
 where
     T: DeserializeOwned,
@@ -103,7 +105,12 @@ where
                         match token_container.refresh() {
                             Ok(()) => {
                                 info!("Token refreshed successfully.");
-                                request_with_auth(original_request, token_container, true)
+                                request_with_auth(
+                                    original_request,
+                                    token_container,
+                                    true,
+                                    exponential_backoff,
+                                )
                             }
                             Err(e) => {
                                 if let ClientConnectionHandlingError::RefreshSpotifyTokenFailed = e
@@ -115,6 +122,23 @@ where
                                 }
                                 Err(e)
                             }
+                        }
+                    }
+                }
+                ureq::Error::Status(429, _) => {
+                    match exponential_backoff.increase_after_limit_exceeded() {
+                        Some((duration, new_backoff)) => {
+                            std::thread::sleep(duration);
+                            request_with_auth(
+                                original_request,
+                                token_container,
+                                retry_after_auth_failure,
+                                new_backoff,
+                            )
+                        }
+                        None => {
+                            error!("Max. number of retries reached after rate limit exceeded.");
+                            Err(ClientConnectionHandlingError::UreqError(e))
                         }
                     }
                 }
@@ -154,7 +178,12 @@ pub fn get_relevant_playlists(
 
     let single_page_request = |url: &str, token_container: &mut TokenContainer| {
         let request = ureq::get(url).query_pairs(query_params.clone());
-        request_with_auth::<SpotifyPlaylistSimplified>(request, token_container, false)
+        request_with_auth::<SpotifyPlaylistSimplified>(
+            request,
+            token_container,
+            false,
+            ExponentialBackoff::default(),
+        )
     };
 
     let playlist_objects = fetch_all_pages(token_container, url, single_page_request)?;
@@ -166,41 +195,42 @@ pub fn get_relevant_playlists(
 
     let relevant_playlists: Vec<SpotifySimplifiedPlaylistObject> = playlists
         .into_iter()
-        .filter(|p| {
-            p.description
-                .clone()
-                .map(|d| d.contains(AUDIOWARDEN_BLOCK_SONGS_KEYWORD))
+        .filter(|playlist| {
+            playlist
+                .description
+                .as_ref()
+                .map(|description| description.contains(AUDIOWARDEN_BLOCK_SONGS_KEYWORD))
                 .unwrap_or(false)
         })
         .collect();
 
     info!(
-        "got the following playlist from /me: {:#?}",
-        relevant_playlists
+        "Retrieved {} playlist from /v1/me/playlists",
+        relevant_playlists.len()
     );
     Ok(relevant_playlists)
 }
 
-pub fn playlist_tracks(
+pub fn fetch_track_urls(
     token_container: &mut TokenContainer,
-    playlist: &SpotifyPlaylist,
+    tracks: &SpotifyPlaylistTracks,
 ) -> ClientConnectionResult<Vec<String>> {
-    let mut tracks = song_ids_from_playlist(&playlist.tracks);
-    if let Some(next) = &playlist.tracks.next {
+    let mut song_ids = extract_track_urls(tracks);
+    if let Some(next) = &tracks.next {
         let additional_tracks = parse_playlist_tracks(token_container, next)?;
-        tracks.extend(additional_tracks)
+        song_ids.extend(additional_tracks)
     }
 
-    Ok(tracks)
+    Ok(song_ids)
 }
 
-fn song_ids_from_playlist(playlist_tracks: &SpotifyPlaylistTracks) -> Vec<String> {
+fn extract_track_urls(playlist_tracks: &SpotifyPlaylistTracks) -> Vec<String> {
     playlist_tracks
         .items
         .iter()
         .filter_map(|track| match &track.track {
             SpotifyTrackOrEpisodeObject::SpotifyEpisodeObject { .. } => {
-                // podcast episodes are ignored, we support only normal music tracks.
+                // podcast episodes are ignored, we support only music tracks.
                 None
             }
             SpotifyTrackOrEpisodeObject::SpotifyTrackObject {
@@ -226,35 +256,20 @@ fn parse_playlist_tracks(
 ) -> ClientConnectionResult<Vec<String>> {
     let single_page_request = |url: &str, token_container: &mut TokenContainer| {
         let request = ureq::get(url);
-        request_with_auth::<SpotifyPlaylistTracks>(request, token_container, false)
+        request_with_auth::<SpotifyPlaylistTracks>(
+            request,
+            token_container,
+            false,
+            ExponentialBackoff::default(),
+        )
     };
     let pages = fetch_all_pages(token_container, url, single_page_request)?;
     let tracks: Vec<String> = pages
         .into_iter()
-        .flat_map(|tracks_from_page| song_ids_from_playlist(&tracks_from_page))
+        .flat_map(|tracks_from_page| extract_track_urls(&tracks_from_page))
         .collect();
 
     Ok(tracks)
-}
-
-pub fn playlist_from_id(
-    token_container: &mut TokenContainer,
-    playlist_id: &str,
-) -> ClientConnectionResult<SpotifyPlaylist> {
-    let url = format!("https://api.spotify.com/v1/playlists/{}", playlist_id);
-    // Filter which fields we actually require, to keep the payload small, for simplicity and
-    // performance.
-    let fields = "id,uri,name,description,href,snapshot_id,tracks(next,offset,limit,total),tracks.items(is_local,track(uri,external_urls,is_local,type))";
-    let query_params = vec![("fields", fields)];
-
-    let spotify_playlist = token_container
-        .set_auth_header(ureq::get(&url))
-        .query_pairs(query_params)
-        .set("Content-Type", "application/json")
-        .call()?
-        .into_json::<SpotifyPlaylist>()?;
-
-    Ok(spotify_playlist)
 }
 
 pub fn update_blocked_songs_in_cache(
@@ -291,7 +306,7 @@ fn blocked_songs_from_playlist(
             return vec![];
         }
     };
-    let playlist_tracks = match playlist_tracks(token_container, &playlist) {
+    let playlist_tracks = match fetch_track_urls(token_container, &playlist.tracks) {
         Ok(tracks) => tracks,
         Err(e) => {
             error!(
@@ -308,6 +323,26 @@ fn blocked_songs_from_playlist(
             playlist_name: playlist.name.clone(),
         })
         .collect::<Vec<BlockedSong>>()
+}
+
+fn playlist_from_id(
+    token_container: &mut TokenContainer,
+    playlist_id: &str,
+) -> ClientConnectionResult<SpotifyPlaylist> {
+    let url = format!("https://api.spotify.com/v1/playlists/{}", playlist_id);
+    // Filter which fields we actually require, to keep the payload small, for simplicity and
+    // performance.
+    let fields = "id,uri,name,description,href,snapshot_id,tracks(next,offset,limit,total),\
+        tracks.items(is_local,track(uri,external_urls,is_local,type))";
+    let query_params = vec![("fields", fields)];
+    let spotify_playlist = token_container
+        .set_auth_header(ureq::get(&url))
+        .query_pairs(query_params)
+        .set("Content-Type", "application/json")
+        .call()?
+        .into_json::<SpotifyPlaylist>()?;
+
+    Ok(spotify_playlist)
 }
 
 #[derive(Debug)]
@@ -389,6 +424,44 @@ impl TokenContainer {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct ExponentialBackoff {
+    max_retries: u32,
+    previous_retries: u32,
+    backoff_duration: Duration,
+}
+
+impl ExponentialBackoff {
+    /// Returns the duration to wait for after the rate limit was exceeded, and the updated
+    /// ExponentialBackoff to be used if the rate limit is exceeded in subsequent requests.
+    fn increase_after_limit_exceeded(&self) -> Option<(Duration, Self)> {
+        if self.max_retries > self.previous_retries {
+            let backoff = Self {
+                max_retries: self.max_retries,
+                previous_retries: self.previous_retries + 1,
+                backoff_duration: self.backoff_duration * 2,
+            };
+            Some((self.backoff_duration, backoff))
+        } else {
+            None
+        }
+    }
+
+    fn new(initial_backoff_duration: Duration, max_retries: u32) -> Self {
+        Self {
+            max_retries,
+            backoff_duration: initial_backoff_duration,
+            previous_retries: 0,
+        }
+    }
+}
+
+impl Default for ExponentialBackoff {
+    fn default() -> Self {
+        Self::new(Duration::from_secs(1), 4)
+    }
+}
+
 type ClientConnectionResult<T> = Result<T, ClientConnectionHandlingError>;
 
 const SPOTIFY_PLAYLISTS_MAX_PER_PAGE: &str = "50";
@@ -396,3 +469,27 @@ const AUDIOWARDEN_BLOCK_SONGS_KEYWORD: &str = "audiowarden:block_songs";
 const CLIENT_ID: &str = "a9cc0c11a3944da8a4f97ecfc92a972d";
 const REDIRECT_URI: &str = "http://localhost:7185";
 const SCOPE: &str = "playlist-read-private";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exponential_backoff_test() {
+        let initial_backoff = ExponentialBackoff::new(Duration::from_millis(200), 1);
+        let (duration_to_wait, new_backoff) =
+            initial_backoff.increase_after_limit_exceeded().unwrap();
+        let expected_new_backoff = ExponentialBackoff {
+            max_retries: 1,
+            previous_retries: 1,
+            backoff_duration: Duration::from_millis(400),
+        };
+
+        assert_eq!(duration_to_wait, Duration::from_millis(200));
+        assert_eq!(new_backoff, expected_new_backoff);
+
+        let next_backoff = new_backoff.increase_after_limit_exceeded();
+
+        assert_eq!(next_backoff, None);
+    }
+}

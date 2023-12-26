@@ -69,7 +69,7 @@ fn get_socket_path() -> Result<PathBuf, String> {
     }
 }
 
-pub fn remove_socketfile(path: &Path) -> io::Result<()> {
+fn remove_socketfile(path: &Path) -> io::Result<()> {
     match fs::remove_file(path) {
         Ok(_) => {
             // File successfully removed.
@@ -83,7 +83,7 @@ pub fn remove_socketfile(path: &Path) -> io::Result<()> {
     }
 }
 
-pub fn handle_client(mut stream: UnixStream, tx: Arc<Sender<ClientMessage>>) {
+fn handle_client(mut stream: UnixStream, tx: Arc<Sender<ClientMessage>>) {
     let message_result = read_string_until_eof(&mut stream);
     match message_result {
         Ok(s) if s == "login_to_spotify\n" || s == "login_to_spotify" => {

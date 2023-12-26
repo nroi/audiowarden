@@ -28,7 +28,7 @@ fn main() {
             }
         }
         Ok(None) => {
-            info!("No token exists yet - the user must login first.");
+            info!("No token exists yet – the user must login first.");
             match spotify_login_start() {
                 Ok(url) => {
                     info!("Please visit the following URL in your browser: {}", url)

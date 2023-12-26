@@ -71,7 +71,7 @@ fn handle_message(message: &dbus::Message) {
             debug!("{} songs are blocked.", blocked_songs.len());
             for message_item in message.get_items() {
                 if let MessageItem::Dict(d) = &message_item {
-                    if let Some(attrs) = get_attrs(d) {
+                    if let Some(attrs) = song_attributes_from_message_item(d) {
                         let maybe_blocked_song = blocked_songs
                             .iter()
                             .find(|blocked_song| blocked_song.spotify_url == attrs.url);
@@ -94,20 +94,13 @@ fn handle_message(message: &dbus::Message) {
     }
 }
 
-fn string_from_message_item(message_item: &MessageItem) -> Option<&str> {
-    match message_item {
-        MessageItem::Str(s) => Some(s),
-        _ => None,
-    }
-}
-
 fn vec_from_message_item(message_item: &MessageItem) -> Option<Vec<&str>> {
-    let mut values = vec![];
+    let mut string_values = vec![];
     match message_item {
         MessageItem::Array(a) => {
             for v in a.iter() {
                 match v.peel() {
-                    MessageItem::Str(s) => values.push(s.as_str()),
+                    MessageItem::Str(s) => string_values.push(s.as_str()),
                     _ => return None,
                 }
             }
@@ -115,10 +108,10 @@ fn vec_from_message_item(message_item: &MessageItem) -> Option<Vec<&str>> {
         _ => return None,
     }
 
-    Some(values)
+    Some(string_values)
 }
 
-fn get_attrs(dict: &MessageItemDict) -> Option<SongAttributes> {
+fn song_attributes_from_message_item(dict: &MessageItemDict) -> Option<SongAttributes> {
     debug!("processing dict: {:?}", dict);
     let mut artist: Option<String> = None;
     let mut title: Option<String> = None;
@@ -180,17 +173,25 @@ fn get_attrs(dict: &MessageItemDict) -> Option<SongAttributes> {
             Some(SongAttributes { url, artist, title })
         }
         _ => {
-            // if no URL exists, or the URL does not contain the spotify host, then the event was probably not emitted
-            // by spotify and should be ignored.
+            // if no URL exists, or the URL does not contain the spotify host, then the event was
+            // probably not emitted by Spotify and should be ignored.
             None
         }
     }
 }
+
+fn string_from_message_item(message_item: &MessageItem) -> Option<&str> {
+    match message_item {
+        MessageItem::Str(s) => Some(s),
+        _ => None,
+    }
+}
+
 #[derive(Debug)]
-pub struct SongAttributes {
-    pub url: String,
-    pub artist: Option<String>,
-    pub title: Option<String>,
+struct SongAttributes {
+    url: String,
+    artist: Option<String>,
+    title: Option<String>,
 }
 
 impl Display for SongAttributes {

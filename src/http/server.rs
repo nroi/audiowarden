@@ -122,7 +122,7 @@ fn request_target_from_stream(
         .take_while(|line| !line.is_empty())
         .collect();
 
-    match http_request.get(0) {
+    match http_request.first() {
         Some(http_request_line) => match request_target(http_request_line) {
             Some(target) => Ok(target),
             None => {

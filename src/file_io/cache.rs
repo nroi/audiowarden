@@ -13,7 +13,7 @@ use crate::file_io::model::Versioned;
 use crate::model::BlockedSong;
 use crate::APPLICATION_NAME;
 
-pub fn store_blocked_songs(blocked_songs: Vec<BlockedSong>) -> Result<(), io::Error> {
+pub fn store_blocked_songs(blocked_songs: Vec<BlockedSong>) -> io::Result<()> {
     let filename = get_cache_filename();
     let blocked_songs_v1: Vec<BlockedSongV1> =
         blocked_songs.into_iter().map(BlockedSongV1::from).collect();
@@ -37,7 +37,7 @@ pub fn store_blocked_songs(blocked_songs: Vec<BlockedSong>) -> Result<(), io::Er
     Ok(())
 }
 
-pub fn get_blocked_songs() -> Result<Vec<BlockedSong>, io::Error> {
+pub fn get_blocked_songs() -> io::Result<Vec<BlockedSong>> {
     let filename = get_cache_filename();
     let file = match File::open(filename) {
         Ok(f) => f,
