@@ -14,33 +14,51 @@ use crate::model::BlockedSong;
 use crate::APPLICATION_NAME;
 
 pub fn store_blocked_songs(blocked_songs: Vec<BlockedSong>) -> io::Result<()> {
-    let filename = get_cache_filename();
+    let filename = get_blocked_songs_filename();
+    store_blocked_songs_to_file(blocked_songs, &filename)
+}
+
+pub fn store_blocked_songs_for_playlist(
+    playlist_uri: &str,
+    snapshot_id: &str,
+    blocked_songs: Vec<BlockedSong>,
+) -> io::Result<()> {
+    let filename = get_blocked_songs_for_playlist_filename(playlist_uri, snapshot_id);
+    store_blocked_songs_to_file(blocked_songs, &filename)
+}
+
+fn store_blocked_songs_to_file(blocked_songs: Vec<BlockedSong>, filename: &Path) -> io::Result<()> {
     let blocked_songs_v1: Vec<BlockedSongV1> =
         blocked_songs.into_iter().map(BlockedSongV1::from).collect();
     let cache = AudiowardenCacheV1 {
         version: 1,
         blocked_songs: blocked_songs_v1,
     };
-    let cache_as_json = serde_json::to_string(&cache)?;
-    let file = match File::create(&filename) {
-        Ok(f) => f,
+
+    serialize_json_gz(&cache, filename)
+}
+
+pub fn get_blocked_songs_of_playlist(
+    playlist_uri: &str,
+    snapshot_id: &str,
+) -> io::Result<Option<Vec<BlockedSong>>> {
+    let filename = get_blocked_songs_for_playlist_filename(playlist_uri, snapshot_id);
+    let blocked_songs = match get_blocked_songs_from_file(&filename) {
+        Ok(songs) => songs,
         Err(e) if e.kind() == ErrorKind::NotFound => {
-            create_cache_directory()?;
-            File::create(&filename)?
+            // playlist is not cached, yet.
+            return Ok(None);
         }
         Err(e) => return Err(e),
     };
-    let writer = BufWriter::new(file);
-    let mut encoder = GzEncoder::new(writer, Compression::default());
-    encoder.write_all(cache_as_json.as_bytes())?;
 
-    Ok(())
+    Ok(Some(blocked_songs))
 }
 
 pub fn get_blocked_songs() -> io::Result<Vec<BlockedSong>> {
-    let filename = get_cache_filename();
-    let file = match File::open(filename) {
-        Ok(f) => f,
+    let filename = get_blocked_songs_filename();
+    let blocked_songs = match get_blocked_songs_from_file(&filename) {
+        Ok(songs) => songs,
         Err(e) if e.kind() == ErrorKind::NotFound => {
             // This is not an error: If audiowarden starts for the first time, for example, then
             // the file does not exist yet.
@@ -48,17 +66,65 @@ pub fn get_blocked_songs() -> io::Result<Vec<BlockedSong>> {
         }
         Err(e) => return Err(e),
     };
-    let reader = BufReader::new(file);
-    let decoder = GzDecoder::new(reader);
-    let cache: AudiowardenCacheV1 = serde_json::from_reader(decoder)?;
-    let blocked_songs: Vec<BlockedSong> =
-        cache.blocked_songs.into_iter().map(|b| b.into()).collect();
 
     Ok(blocked_songs)
 }
 
-fn get_cache_filename() -> PathBuf {
+fn get_blocked_songs_from_file(filename: &Path) -> io::Result<Vec<BlockedSong>> {
+    let cache: AudiowardenCacheV1 = deserialize_json_gz(filename)?;
+    let blocked_songs = cache.blocked_songs.into_iter().map(|b| b.into()).collect();
+
+    Ok(blocked_songs)
+}
+
+fn deserialize_json_gz<T>(filename: &Path) -> io::Result<T>
+where
+    T: for<'de> serde::Deserialize<'de>,
+{
+    let file = File::open(filename)?;
+    let reader = BufReader::new(file);
+    let decoder = GzDecoder::new(reader);
+    let result: T = serde_json::from_reader(decoder)?;
+
+    Ok(result)
+}
+
+fn serialize_json_gz<T>(value: &T, filename: &Path) -> io::Result<()>
+where
+    T: serde::Serialize,
+{
+    let cache_as_json = serde_json::to_string(value)?;
+    let file = match File::create(filename) {
+        Ok(f) => f,
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            create_parent_directory(filename)?;
+            File::create(filename)?
+        }
+        Err(e) => return Err(e),
+    };
+
+    let writer = BufWriter::new(file);
+    let mut encoder = GzEncoder::new(writer, Compression::default());
+    encoder.write_all(cache_as_json.as_bytes())?;
+
+    Ok(())
+}
+
+fn create_parent_directory(filename: &Path) -> io::Result<()> {
+    if let Some(parent) = filename.parent() {
+        fs::create_dir_all(parent)
+    } else {
+        Ok(())
+    }
+}
+
+fn get_blocked_songs_filename() -> PathBuf {
     get_cache_directory().join("blocked_songs.json.gz")
+}
+
+fn get_blocked_songs_for_playlist_filename(playlist_uri: &str, snapshot_id: &str) -> PathBuf {
+    let filename = format!("{}.json.gz", snapshot_id);
+    get_cache_directory().join(playlist_uri).join(filename)
 }
 
 fn get_cache_directory() -> PathBuf {
@@ -75,11 +141,6 @@ fn get_cache_directory() -> PathBuf {
         // is just not usable in any reasonable way.
         panic!("None of the environment vars CACHE_DIRECTORY, XDG_CACHE_HOME or HOME is set.");
     }
-}
-
-fn create_cache_directory() -> io::Result<()> {
-    let directory = get_cache_directory();
-    fs::create_dir_all(directory)
 }
 
 #[derive(Serialize, Deserialize)]

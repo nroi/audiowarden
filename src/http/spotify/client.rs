@@ -286,10 +286,48 @@ fn get_blocked_songs(
     let relevant_playlists = get_relevant_playlists(token_container)?;
     let blocked_songs: Vec<BlockedSong> = relevant_playlists
         .iter()
-        .flat_map(|playlist| blocked_songs_from_playlist(playlist, token_container))
+        .flat_map(|playlist| blocked_songs_from_playlist_via_cache(playlist, token_container))
         .collect();
 
     Ok(blocked_songs)
+}
+
+fn blocked_songs_from_playlist_via_cache(
+    playlist: &SpotifySimplifiedPlaylistObject,
+    token_container: &mut TokenContainer,
+) -> Vec<BlockedSong> {
+    let blocked_songs_from_cache =
+        match cache::get_blocked_songs_of_playlist(&playlist.uri, &playlist.snapshot_id) {
+            Err(e) => {
+                error!("Unable to retrieve playlist from cache: {:?}", e);
+                None
+            }
+            Ok(blocked_songs) => blocked_songs,
+        };
+    match blocked_songs_from_cache {
+        Some(songs) => {
+            info!(
+                "Retrieved songs for playlist <{}> [{}] via cache.",
+                &playlist.name, &playlist.uri
+            );
+            songs
+        }
+        None => {
+            info!(
+                "Playlist <{}> [{}] is not available in cache.",
+                &playlist.name, &playlist.uri
+            );
+            let songs = blocked_songs_from_playlist(playlist, token_container);
+            if let Err(e) = cache::store_blocked_songs_for_playlist(
+                &playlist.uri,
+                &playlist.snapshot_id,
+                songs.clone(),
+            ) {
+                error!("Unable to store playlist in cache: {:?}", e);
+            }
+            songs
+        }
+    }
 }
 
 fn blocked_songs_from_playlist(
