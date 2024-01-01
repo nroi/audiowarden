@@ -66,32 +66,38 @@ pub fn play_next() {
 }
 
 fn handle_message(message: &dbus::Message) {
-    match cache::get_blocked_songs() {
-        Ok(blocked_songs) => {
-            debug!("{} songs are blocked.", blocked_songs.len());
-            for message_item in message.get_items() {
-                if let MessageItem::Dict(d) = &message_item {
-                    if let Some(attrs) = song_attributes_from_message_item(d) {
-                        let maybe_blocked_song = blocked_songs
-                            .iter()
-                            .find(|blocked_song| blocked_song.spotify_url == attrs.url);
-                        let suffix = match maybe_blocked_song {
-                            None => "[NOT BLOCKED]".to_string(),
-                            Some(blocked_song) => {
-                                play_next();
-                                format!("[BLOCKED] via playlist <{}>", blocked_song.playlist_name)
-                            }
-                        };
-
-                        info!("{} {}", attrs, suffix);
-                    }
-                }
-            }
-        }
+    let blocked_songs = match cache::get_blocked_songs() {
+        Ok(songs) => songs,
         Err(e) => {
-            error!("Unable to determine blocked songs: {:?}", e)
+            error!("Unable to determine blocked songs: {:?}", e);
+            return;
         }
+    };
+    for song_attributes in song_attributes_from_message(message) {
+        let maybe_blocked_song = blocked_songs
+            .iter()
+            .find(|blocked_song| blocked_song.spotify_url == song_attributes.url);
+        let suffix = match maybe_blocked_song {
+            None => "[NOT BLOCKED]".to_string(),
+            Some(blocked_song) => {
+                play_next();
+                format!("[BLOCKED] via playlist <{}>", blocked_song.playlist_name)
+            }
+        };
+
+        info!("{} {}", song_attributes, suffix);
     }
+}
+
+fn song_attributes_from_message(message: &dbus::Message) -> Vec<SongAttributes> {
+    message
+        .get_items()
+        .iter()
+        .flat_map(|message_item| match &message_item {
+            MessageItem::Dict(d) => song_attributes_from_message_item(d),
+            _ => None,
+        })
+        .collect()
 }
 
 fn vec_from_message_item(message_item: &MessageItem) -> Option<Vec<&str>> {
