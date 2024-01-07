@@ -1,6 +1,8 @@
+use log::{error, warn};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
 use std::{io, thread};
 
 use regex::Regex;
@@ -10,9 +12,14 @@ use http::spotify::client;
 
 use crate::file_io::state;
 use crate::http;
-use crate::http::spotify::client::TokenContainer;
+use crate::http::spotify::client::{TokenContainer, TokenOption};
 
-pub fn listen(code_verifier: &str, state: &str, auth_url: &Url) -> io::Result<()> {
+pub fn listen(
+    code_verifier: &str,
+    state: &str,
+    auth_url: &Url,
+    token_option: Arc<Mutex<TokenOption>>,
+) -> io::Result<()> {
     let code_verifier = code_verifier.to_string();
     let state = state.to_string();
     let auth_url = auth_url.clone();
@@ -21,7 +28,8 @@ pub fn listen(code_verifier: &str, state: &str, auth_url: &Url) -> io::Result<()
     thread::spawn(move || {
         for stream in listener.incoming() {
             let mut stream = stream.unwrap();
-            let result = handle_connection(&mut stream, &code_verifier, &state);
+            let result =
+                handle_connection(&mut stream, &code_verifier, &state, token_option.clone());
             match result {
                 Ok(HandleConnectionResult::BadRequest) => {
                     let response = "HTTP/1.1 400 Bad Request\r\n\
@@ -64,6 +72,7 @@ fn handle_connection(
     stream: &mut TcpStream,
     code_verifier: &str,
     state: &str,
+    token_option: Arc<Mutex<TokenOption>>,
 ) -> Result<HandleConnectionResult, client::ClientConnectionHandlingError> {
     let request_target = request_target_from_stream(stream)?;
     if request_target == "/authorize_audiowarden" {
@@ -80,6 +89,7 @@ fn handle_connection(
                     if let Err(e) = client::update_blocked_songs_in_cache(&mut token_container) {
                         error!("Unable to update blocked songs: {:?}", e);
                     }
+                    token_option.lock().unwrap().token_container = Some(token_container);
                     Ok(HandleConnectionResult::Redirect(true))
                 } else {
                     // The state from the redirect URI does not match the state that we previously

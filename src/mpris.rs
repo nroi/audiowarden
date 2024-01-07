@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use dbus::arg::messageitem::{MessageItem, MessageItemDict};
@@ -6,11 +7,13 @@ use dbus::blocking::Connection;
 use dbus::channel::MatchingReceiver;
 use dbus::message::MatchRule;
 use dbus::strings::Member;
-use dbus::MessageType;
+use dbus::{Message, MessageType};
 
 use crate::cache;
+use crate::http::spotify::client;
+use crate::http::spotify::client::TokenOption;
 
-pub fn setup_mpris_connection() {
+pub fn setup_mpris_connection(token_option: Arc<Mutex<TokenOption>>) {
     let conn = Connection::new_session().expect("Unable to open D-Bus connection.");
     let proxy = conn.with_proxy(
         "org.freedesktop.DBus",
@@ -34,8 +37,8 @@ pub fn setup_mpris_connection() {
 
     conn.start_receive(
         rule,
-        Box::new(|msg, _| {
-            handle_message(&msg);
+        Box::new(move |msg, _| {
+            handle_message(&msg, token_option.clone(), false);
             true
         }),
     );
@@ -65,7 +68,7 @@ pub fn play_next() {
     }
 }
 
-fn handle_message(message: &dbus::Message) {
+fn handle_message(message: &Message, token_option: Arc<Mutex<TokenOption>>, cache_updated: bool) {
     let blocked_songs = match cache::get_blocked_songs() {
         Ok(songs) => songs,
         Err(e) => {
@@ -73,10 +76,20 @@ fn handle_message(message: &dbus::Message) {
             return;
         }
     };
-    for song_attributes in song_attributes_from_message(message) {
+    let song_attributes = song_attributes_from_message(message);
+    if song_attributes.len() > 1 {
+        error!(
+            "Received more than one song via a single MPRIS message, this is unexpected. We \
+            will only consider the first song. These are the songs we've \
+            received: {:?}",
+            song_attributes
+        );
+    }
+    if let Some(song_attributes) = song_attributes.first() {
         let maybe_blocked_song = blocked_songs
             .iter()
             .find(|blocked_song| blocked_song.spotify_url == song_attributes.url);
+
         let suffix = match maybe_blocked_song {
             None => "[NOT BLOCKED]".to_string(),
             Some(blocked_song) => {
@@ -86,10 +99,41 @@ fn handle_message(message: &dbus::Message) {
         };
 
         info!("{} {}", song_attributes, suffix);
+
+        // Update the cache, if it's not already up-to-date. Note that it might seem
+        // counterintuitive to update the cache now (it would seem more reasonable to update the
+        // cache before we decide if the song should be blocked or not). However, we're doing it
+        // this way in order to avoid that any latency can be perceived by the user: If the
+        // currently playing song should be blocked, this should happen immediately, and not just
+        // after we have updated the cache.
+        if !cache_updated {
+            info!("The cache might be stale, so we update it.");
+            let mut token_option_guard = token_option.lock().unwrap();
+            let cache_update_successful = match token_option_guard.token_container.as_mut() {
+                None => false,
+                Some(token_container) => {
+                    match client::update_blocked_songs_in_cache(token_container) {
+                        Ok(()) => true,
+                        Err(e) => {
+                            error!("Unable to update blocked songs: {:?}", e);
+                            false
+                        }
+                    }
+                }
+            };
+
+            // If we had to update the cache, and we did not block the currently playing song,
+            // then it's possible that we've made the wrong decision based on information in a
+            // stale cache (i.e., if the song is not blocked in the stale cache, but is blocked
+            // in the current cache). So, we re-run this function.
+            if cache_update_successful && maybe_blocked_song.is_none() {
+                handle_message(message, token_option.clone(), true)
+            }
+        }
     }
 }
 
-fn song_attributes_from_message(message: &dbus::Message) -> Vec<SongAttributes> {
+fn song_attributes_from_message(message: &Message) -> Vec<SongAttributes> {
     message
         .get_items()
         .iter()

@@ -1,8 +1,10 @@
 use std::io;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use base64::engine::general_purpose;
 use base64::Engine;
+use log::{error, info};
 use rand::distributions::{Alphanumeric, DistString};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -19,7 +21,7 @@ use crate::http::spotify::model::{
 use crate::model::BlockedSong;
 
 /// Returns the URL to be visited by the user
-pub fn spotify_login_start() -> io::Result<Url> {
+pub fn spotify_login_start(token_option: Arc<Mutex<TokenOption>>) -> io::Result<Url> {
     let code_verifier = generate_random_string(128);
     let code_challenge = sha256_base64_encoded(&code_verifier);
     let state = generate_random_string(16);
@@ -36,7 +38,7 @@ pub fn spotify_login_start() -> io::Result<Url> {
         ],
     )
     .unwrap();
-    server::listen(&code_verifier, &state, &url)?;
+    server::listen(&code_verifier, &state, &url, token_option)?;
 
     Ok(url)
 }
@@ -102,7 +104,8 @@ where
                         // Otherwise, the 401 may be because our token has expired, so we try a
                         // refresh and then try again.
                         info!("Spotify returned 401, token refresh may be required.");
-                        match token_container.refresh() {
+                        let result = token_container.refresh();
+                        match result {
                             Ok(()) => {
                                 info!("Token refreshed successfully.");
                                 request_with_auth(
@@ -192,6 +195,7 @@ pub fn get_relevant_playlists(
         .into_iter()
         .flat_map(|page| page.items)
         .collect();
+    let playlists_len = playlists.len();
 
     let relevant_playlists: Vec<SpotifySimplifiedPlaylistObject> = playlists
         .into_iter()
@@ -205,8 +209,9 @@ pub fn get_relevant_playlists(
         .collect();
 
     info!(
-        "Retrieved {} playlist from /v1/me/playlists",
-        relevant_playlists.len()
+        "Retrieved {} playlist from /v1/me/playlists, {} of those include songs to be blocked.",
+        playlists_len,
+        &relevant_playlists.len()
     );
     Ok(relevant_playlists)
 }
@@ -276,7 +281,7 @@ pub fn update_blocked_songs_in_cache(
     token_container: &mut TokenContainer,
 ) -> Result<(), AudioWardenError> {
     let blocked_songs = get_blocked_songs(token_container)?;
-    info!("blocked songs: {:#?}", blocked_songs);
+    info!("Got {} blocked songs.", blocked_songs.len());
     Ok(cache::store_blocked_songs(blocked_songs)?)
 }
 
@@ -419,8 +424,14 @@ pub struct TokenResponse {
 //    should be updated with the new token.
 // We use many &mut TokenContainer references throughout the code. Therefore, following these rules
 // ensures that, whenever the token is refreshed, each ref is now using the most up-to-date token.
+#[derive(Debug)]
 pub struct TokenContainer {
     token: TokenResponse,
+}
+
+#[derive(Debug)]
+pub struct TokenOption {
+    pub token_container: Option<TokenContainer>,
 }
 
 impl TokenContainer {

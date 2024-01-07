@@ -1,3 +1,4 @@
+use log::error;
 use std::io::ErrorKind::NotFound;
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
